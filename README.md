@@ -67,8 +67,8 @@ flowchart TD
     end
 
     subgraph Eval["Evaluation Suite"]
-        RetEval[Recall@K & MRR]
-        GenEval[Faithfulness & Relevance]
+        RetEval["Recall@K and MRR Metrics"]
+        GenEval["Faithfulness and Answer Relevance"]
     end
 
     Upload --> PDF
