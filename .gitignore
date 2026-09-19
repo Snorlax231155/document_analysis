@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.env
+
+# Data & Indexes (except test_docs and sample datasets)
+data/app.db
+data/documents/*
+!data/documents/.gitkeep
+data/indexes/*
+!data/indexes/.gitkeep
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+
+# Coverage / Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

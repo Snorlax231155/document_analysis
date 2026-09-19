@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enterprise Document Intelligence & RAG Assistant</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN for Evaluation Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              700: '#1e40af',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #090d16; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    .panel-card { background: #0f172a; border: 1px solid #1e293b; }
+    .chat-scroll::-webkit-scrollbar { width: 5px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased text-slate-200">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-[#0c1220] sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+        <i class="fa-solid fa-layer-group"></i>
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-tight text-slate-100 flex items-center gap-2">
+          Enterprise Document Intelligence & RAG System
+          <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">v1.0.0</span>
+        </h1>
+        <p class="text-[11px] text-slate-400 font-mono">Page-Aware Search • FAISS Vector Store • RRF Fusion • Ollama / LLM API</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex items-center space-x-1 bg-slate-900 p-1 rounded-md border border-slate-800">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-3.5 py-1.5 rounded-sm text-xs font-semibold transition-all text-white bg-blue-600 shadow-sm">
+        <i class="fa-solid fa-gauge-high mr-1.5"></i>Dashboard
+      </button>
+      <button onclick="switchTab('documents')" id="tab-documents" class="tab-btn px-3.5 py-1.5 rounded-sm text-xs font-semibold transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-folder-tree mr-1.5"></i>Documents
+      </button>
+      <button onclick="switchTab('chat')" id="tab-chat" class="tab-btn px-3.5 py-1.5 rounded-sm text-xs font-semibold transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-terminal mr-1.5"></i>RAG Assistant
+      </button>
+      <button onclick="switchTab('evaluation')" id="tab-evaluation" class="tab-btn px-3.5 py-1.5 rounded-sm text-xs font-semibold transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-vial mr-1.5"></i>Evaluation
+      </button>
+    </nav>
+
+    <!-- Provider Status Badge -->
+    <div id="provider-badge" class="hidden md:flex items-center space-x-2 text-[11px] font-mono px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300">
+      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span id="provider-label">Detecting Provider...</span>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+    <!-- 1. DASHBOARD TAB -->
+    <section id="view-dashboard" class="tab-content space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="panel-card p-4 rounded-md">
+          <p class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Total Documents</p>
+          <h3 id="stat-docs" class="text-2xl font-bold text-white mt-1">0</h3>
+        </div>
+
+        <div class="panel-card p-4 rounded-md">
+          <p class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Indexed Chunks</p>
+          <h3 id="stat-chunks" class="text-2xl font-bold text-white mt-1">0</h3>
+        </div>
+
+        <div class="panel-card p-4 rounded-md">
+          <p class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Avg Retrieval Latency</p>
+          <h3 id="stat-retrieval-latency" class="text-2xl font-bold text-blue-400 mt-1">0 ms</h3>
+        </div>
+
+        <div class="panel-card p-4 rounded-md">
+          <p class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Avg Generation Latency</p>
+          <h3 id="stat-llm-latency" class="text-2xl font-bold text-emerald-400 mt-1">0 ms</h3>
+        </div>
+      </div>
+
+      <!-- Architecture Breakdown Panel -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="panel-card p-5 rounded-md lg:col-span-2 space-y-4">
+          <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-diagram-project text-blue-400"></i>
+            Engineered RAG Pipeline Specifications
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div class="p-3.5 bg-[#090d16] rounded border border-slate-800 space-y-1.5">
+              <div class="font-bold text-blue-400">1. PDF Ingestion</div>
+              <p class="text-slate-400 font-sans text-[11px]">PyMuPDF text extraction. Token & sentence chunking preserving page metadata and SHA-256 deduplication.</p>
+            </div>
+            <div class="p-3.5 bg-[#090d16] rounded border border-slate-800 space-y-1.5">
+              <div class="font-bold text-purple-400">2. Hybrid RRF Fusion</div>
+              <p class="text-slate-400 font-sans text-[11px]">FAISS L2 normalized cosine search + SQL keyword term matching fused via Reciprocal Rank Fusion.</p>
+            </div>
+            <div class="p-3.5 bg-[#090d16] rounded border border-slate-800 space-y-1.5">
+              <div class="font-bold text-emerald-400">3. LangChain & Rerank</div>
+              <p class="text-slate-400 font-sans text-[11px]">CrossEncoder reranking candidate chunks. LangChain LCEL pipeline formats context with citations.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card p-5 rounded-md space-y-3">
+          <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-amber-400"></i>
+            Quick Operations
+          </h2>
+          <div class="space-y-2 text-xs">
+            <button onclick="switchTab('documents')" class="w-full text-left px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200 font-medium flex items-center justify-between transition-all">
+              <span><i class="fa-solid fa-upload mr-2 text-blue-400"></i>Upload PDF File</span>
+              <i class="fa-solid fa-arrow-right text-slate-500 text-[10px]"></i>
+            </button>
+            <button onclick="switchTab('chat')" class="w-full text-left px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200 font-medium flex items-center justify-between transition-all">
+              <span><i class="fa-solid fa-magnifying-glass mr-2 text-purple-400"></i>Ask Query</span>
+              <i class="fa-solid fa-arrow-right text-slate-500 text-[10px]"></i>
+            </button>
+            <button onclick="triggerEvaluation()" class="w-full text-left px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200 font-medium flex items-center justify-between transition-all">
+              <span><i class="fa-solid fa-chart-simple mr-2 text-emerald-400"></i>Run Benchmark</span>
+              <i class="fa-solid fa-arrow-right text-slate-500 text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. DOCUMENTS TAB -->
+    <section id="view-documents" class="tab-content hidden space-y-6">
+      <!-- Upload Dropzone -->
+      <div class="panel-card p-8 rounded-md border-2 border-dashed border-slate-700 hover:border-blue-500 transition-all text-center space-y-3" id="dropzone">
+        <div class="w-12 h-12 rounded bg-slate-800 text-blue-400 flex items-center justify-center mx-auto text-xl border border-slate-700">
+          <i class="fa-solid fa-file-arrow-up"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Upload Enterprise PDF Documents</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Page-aware PyMuPDF text extraction, chunking, and FAISS indexing with SHA-256 deduplication</p>
+        </div>
+        <div>
+          <label class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded cursor-pointer shadow-sm transition-all inline-block">
+            <i class="fa-solid fa-folder-open mr-1.5"></i>Select PDF
+            <input type="file" id="file-input" accept=".pdf" class="hidden" onchange="uploadSelectedFile(event)" />
+          </label>
+        </div>
+        <div id="upload-status" class="hidden text-xs font-mono text-blue-400"></div>
+      </div>
+
+      <!-- Document List Table -->
+      <div class="panel-card rounded-md overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-[#0c1220]">
+          <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Document Repository</h2>
+          <button onclick="loadDocuments()" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-rotate-right mr-1"></i>Refresh</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900 text-slate-400 uppercase tracking-wider text-[10px] font-mono border-b border-slate-800">
+              <tr>
+                <th class="px-5 py-3">Document Name</th>
+                <th class="px-5 py-3">Pages</th>
+                <th class="px-5 py-3">Chunks</th>
+                <th class="px-5 py-3">File Size</th>
+                <th class="px-5 py-3">SHA-256 Hash</th>
+                <th class="px-5 py-3">Status</th>
+                <th class="px-5 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="docs-table-body" class="divide-y divide-slate-800 text-slate-300 font-mono">
+              <tr>
+                <td colspan="7" class="px-5 py-8 text-center text-slate-500 font-sans">No documents uploaded yet. Upload a PDF file to process and index.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. RAG CHAT ASSISTANT TAB -->
+    <section id="view-chat" class="tab-content hidden h-[calc(100vh-140px)] flex flex-col">
+      <div class="panel-card rounded-md flex-1 flex flex-col overflow-hidden">
+        <!-- Chat Header Controls -->
+        <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-[#0c1220]">
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span class="text-xs font-mono font-semibold text-slate-200">Interactive Document Intelligence Query Console</span>
+          </div>
+          <div class="flex items-center space-x-4 text-xs">
+            <label class="flex items-center space-x-2 text-slate-400 cursor-pointer">
+              <input type="checkbox" id="toggle-rerank" checked class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0" />
+              <span class="font-mono text-[11px]">CrossEncoder Rerank</span>
+            </label>
+            <button onclick="clearChat()" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-trash mr-1"></i>Clear</button>
+          </div>
+        </div>
+
+        <!-- Chat Messages Scroll Container -->
+        <div id="chat-messages" class="flex-1 p-5 space-y-5 overflow-y-auto chat-scroll bg-[#090d16]">
+          <!-- Initial Welcome Message -->
+          <div class="flex items-start space-x-3">
+            <div class="w-7 h-7 rounded bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center font-mono font-bold text-xs shrink-0">
+              SYS
+            </div>
+            <div class="space-y-3 max-w-3xl">
+              <div class="p-3.5 bg-slate-900 border border-slate-800 rounded text-xs leading-relaxed text-slate-200 font-sans">
+                RAG Document Intelligence Assistant initialized. Ask natural language questions or specific policy code queries (e.g. <code class="bg-slate-800 px-1 py-0.5 rounded text-blue-300 font-mono">HR-204</code>, <code class="bg-slate-800 px-1 py-0.5 rounded text-blue-300 font-mono">SEC-402</code>). Answers are strictly grounded in retrieved document chunks with verifiable page citations.
+              </div>
+              <!-- Sample Suggestions -->
+              <div class="flex flex-wrap gap-2 text-[11px] font-mono">
+                <button onclick="useSampleQuery('What is the annual leave policy under HR-204?')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">
+                  "What is the annual leave policy under HR-204?"
+                </button>
+                <button onclick="useSampleQuery('What is the remote work security requirement SEC-402?')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">
+                  "What is remote work security requirement SEC-402?"
+                </button>
+                <button onclick="useSampleQuery('What was the company revenue in 2035?')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">
+                  "Company revenue in 2035?" (Anti-hallucination test)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <div class="p-4 border-t border-slate-800 bg-[#0c1220]">
+          <form onsubmit="handleQuerySubmit(event)" class="flex items-center space-x-3">
+            <input type="text" id="query-input" placeholder="Enter question or policy code to query documents..." class="flex-1 bg-slate-900 border border-slate-800 focus:border-blue-500 rounded px-3.5 py-2.5 text-xs text-white focus:outline-none transition-all font-sans" />
+            <button type="submit" id="send-btn" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded transition-all shadow-sm flex items-center space-x-2 shrink-0">
+              <span>Execute Query</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. EVALUATION DASHBOARD TAB -->
+    <section id="view-evaluation" class="tab-content hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">Quantitative RAG Evaluation Framework</h2>
+          <p class="text-xs text-slate-400">Retrieval metrics (Recall@K, MRR) & Generation metrics (Faithfulness, Answer Relevance)</p>
+        </div>
+        <button onclick="triggerEvaluation()" id="eval-run-btn" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded transition-all shadow-sm flex items-center space-x-2">
+          <i class="fa-solid fa-play text-[10px]"></i>
+          <span>Run Evaluation Suite</span>
+        </button>
+      </div>
+
+      <!-- Metric Cards Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Recall@1</p>
+          <h4 id="eval-r1" class="text-lg font-bold text-blue-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Recall@3</p>
+          <h4 id="eval-r3" class="text-lg font-bold text-blue-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Recall@5</p>
+          <h4 id="eval-r5" class="text-lg font-bold text-blue-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Recall@10</p>
+          <h4 id="eval-r10" class="text-lg font-bold text-blue-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">MRR</p>
+          <h4 id="eval-mrr" class="text-lg font-bold text-purple-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Faithfulness</p>
+          <h4 id="eval-faith" class="text-lg font-bold text-emerald-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+        <div class="panel-card p-3.5 rounded text-center">
+          <p class="text-[10px] text-slate-400 font-mono uppercase">Relevance</p>
+          <h4 id="eval-rel" class="text-lg font-bold text-amber-400 mt-0.5 font-mono">0.00</h4>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="panel-card p-5 rounded space-y-4">
+          <h3 class="text-xs font-bold text-slate-200 flex items-center justify-between font-mono">
+            <span>Retrieval Accuracy (Recall@K & MRR)</span>
+            <span class="text-slate-400 font-normal" id="eval-samples-count">0 Benchmark Samples</span>
+          </h3>
+          <div class="h-60">
+            <canvas id="chart-retrieval"></canvas>
+          </div>
+        </div>
+
+        <div class="panel-card p-5 rounded space-y-4">
+          <h3 class="text-xs font-bold text-slate-200 font-mono">Generation Quality (Faithfulness & Relevance)</h3>
+          <div class="h-60">
+            <canvas id="chart-generation"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JavaScript Frontend Client Logic -->
+  <script>
+    const API_BASE = '/api';
+    let retrievalChart = null;
+    let generationChart = null;
+
+    // Startup Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      checkHealth();
+      loadDocuments();
+      loadLatestEvaluation();
+    });
+
+    // Tab Switching Logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
+        btn.classList.add('text-slate-400');
+      });
+
+      document.getElementById(`view-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      activeBtn.classList.remove('text-slate-400');
+      activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+    }
+
+    // Health check & stats
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        const data = await res.json();
+        document.getElementById('provider-label').innerText = data.llm_provider;
+        document.getElementById('provider-badge').classList.remove('hidden');
+        document.getElementById('stat-docs').innerText = data.documents_count;
+        document.getElementById('stat-chunks').innerText = data.chunks_count;
+      } catch (err) {
+        console.error("Health check error:", err);
+      }
+    }
+
+    // Load Documents Table
+    async function loadDocuments() {
+      try {
+        const res = await fetch(`${API_BASE}/documents`);
+        const docs = await res.json();
+        const tbody = document.getElementById('docs-table-body');
+
+        if (!docs || docs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="px-5 py-8 text-center text-slate-500 font-sans">No documents uploaded yet. Upload a PDF file above to process and index.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = docs.map(d => `
+          <tr class="hover:bg-slate-900/60 transition-colors">
+            <td class="px-5 py-3.5 font-semibold text-slate-100 flex items-center space-x-2 font-sans">
+              <i class="fa-solid fa-file-pdf text-red-400 text-xs"></i>
+              <span>${d.filename}</span>
+            </td>
+            <td class="px-5 py-3.5">${d.page_count} pages</td>
+            <td class="px-5 py-3.5">${d.chunk_count} chunks</td>
+            <td class="px-5 py-3.5">${(d.file_size / 1024).toFixed(1)} KB</td>
+            <td class="px-5 py-3.5 text-slate-400 text-[11px]">${d.file_hash.substring(0, 12)}...</td>
+            <td class="px-5 py-3.5">
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${d.status}</span>
+            </td>
+            <td class="px-5 py-3.5 text-right font-sans">
+              <button onclick="deleteDoc(${d.id})" class="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-all">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `).join('');
+
+        checkHealth();
+      } catch (err) {
+        console.error("Error loading documents:", err);
+      }
+    }
+
+    // Upload selected file
+    async function uploadSelectedFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('upload-status');
+      statusEl.innerText = `Parsing and indexing '${file.name}' page-by-page...`;
+      statusEl.classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch(`${API_BASE}/documents/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`Upload Error: ${data.detail || 'Failed to process PDF'}`);
+        } else {
+          loadDocuments();
+        }
+      } catch (err) {
+        alert(`Upload error: ${err.message}`);
+      } finally {
+        statusEl.classList.add('hidden');
+        event.target.value = '';
+      }
+    }
+
+    // Delete Document
+    async function deleteDoc(docId) {
+      if (!confirm("Are you sure you want to delete this document? The FAISS index will be rebuilt.")) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/documents/${docId}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadDocuments();
+        }
+      } catch (err) {
+        alert("Delete failed: " + err.message);
+      }
+    }
+
+    // Use Sample Query
+    function useSampleQuery(query) {
+      document.getElementById('query-input').value = query;
+      switchTab('chat');
+    }
+
+    // Handle Query Submit
+    async function handleQuerySubmit(event) {
+      event.preventDefault();
+      const input = document.getElementById('query-input');
+      const question = input.value.trim();
+      if (!question) return;
+
+      const enableRerank = document.getElementById('toggle-rerank').checked;
+      const chatContainer = document.getElementById('chat-messages');
+
+      // Append User Message
+      chatContainer.insertAdjacentHTML('beforeend', `
+        <div class="flex items-start justify-end space-x-2">
+          <div class="p-3 bg-blue-600 rounded text-xs leading-relaxed text-white max-w-2xl font-sans">
+            ${escapeHtml(question)}
+          </div>
+          <div class="w-7 h-7 rounded bg-blue-500/20 text-blue-300 flex items-center justify-center font-mono font-bold text-xs shrink-0">USER</div>
+        </div>
+      `);
+
+      input.value = '';
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // Loading Indicator
+      const loadingId = 'loading-' + Date.now();
+      chatContainer.insertAdjacentHTML('beforeend', `
+        <div id="${loadingId}" class="flex items-start space-x-2">
+          <div class="w-7 h-7 rounded bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center font-mono font-bold text-xs shrink-0">SYS</div>
+          <div class="p-3 bg-slate-900 border border-slate-800 rounded text-xs text-slate-400 flex items-center space-x-2 font-mono">
+            <i class="fa-solid fa-spinner fa-spin text-blue-400"></i>
+            <span>Executing FAISS Vector Search + SQL Keyword Match + RRF Fusion + LangChain LCEL...</span>
+          </div>
+        </div>
+      `);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      try {
+        const res = await fetch(`${API_BASE}/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, top_k: 5, enable_reranking: enableRerank })
+        });
+
+        const data = await res.json();
+        document.getElementById(loadingId).remove();
+
+        // Update dashboard timing metrics
+        document.getElementById('stat-retrieval-latency').innerText = `${data.performance.retrieval_ms} ms`;
+        document.getElementById('stat-llm-latency').innerText = `${data.performance.generation_ms} ms`;
+
+        // Format Sources Badges
+        const sourcesHtml = data.sources.length > 0
+          ? `<div class="mt-3 pt-2.5 border-t border-slate-800 space-y-1">
+              <p class="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider">Source Page Citations:</p>
+              <div class="flex flex-wrap gap-1.5 font-mono">
+                ${data.sources.map(s => `
+                  <span class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-blue-300 rounded text-[11px] border border-slate-700 flex items-center space-x-1 cursor-pointer">
+                    <i class="fa-solid fa-file-pdf text-red-400"></i>
+                    <span>${s.document_name} — Page ${s.page_number}</span>
+                  </span>
+                `).join('')}
+              </div>
+            </div>`
+          : '';
+
+        // Format Debug Metadata Drawer
+        const debugId = 'debug-' + Date.now();
+        const debugHtml = `
+          <div class="mt-2">
+            <button onclick="document.getElementById('${debugId}').classList.toggle('hidden')" class="text-[10px] font-mono text-slate-500 hover:text-slate-300 flex items-center space-x-1">
+              <i class="fa-solid fa-code"></i>
+              <span>Toggle Debug Metadata (${data.performance.total_ms} ms total)</span>
+            </button>
+            <div id="${debugId}" class="hidden mt-2 p-3 bg-black/60 border border-slate-800 rounded text-[11px] font-mono text-slate-400 space-y-2">
+              <div class="flex justify-between text-[10px]">
+                <span>FAISS Vector Matches: ${data.retrieval_metadata.semantic_count}</span>
+                <span>SQL Keyword Matches: ${data.retrieval_metadata.keyword_count}</span>
+                <span>CrossEncoder Rerank: ${data.retrieval_metadata.reranking_enabled}</span>
+              </div>
+              <div class="space-y-1">
+                ${data.retrieval_metadata.retrieved_chunks.map(c => `
+                  <div class="p-1.5 bg-slate-900 rounded border border-slate-800 flex justify-between text-[10px]">
+                    <span class="text-blue-400 font-semibold">${c.document} (P.${c.page})</span>
+                    <span>RRF Score: ${c.rrf_score.toFixed(5)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Render AI Answer
+        chatContainer.insertAdjacentHTML('beforeend', `
+          <div class="flex items-start space-x-2">
+            <div class="w-7 h-7 rounded bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center font-mono font-bold text-xs shrink-0">SYS</div>
+            <div class="space-y-1.5 max-w-3xl">
+              <div class="p-3.5 bg-slate-900 border border-slate-800 rounded text-xs leading-relaxed text-slate-100 font-sans shadow-sm">
+                ${escapeHtml(data.answer)}
+                ${sourcesHtml}
+              </div>
+              ${debugHtml}
+            </div>
+          </div>
+        `);
+
+      } catch (err) {
+        document.getElementById(loadingId).remove();
+        alert("Query error: " + err.message);
+      } finally {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    }
+
+    function clearChat() {
+      document.getElementById('chat-messages').innerHTML = '';
+    }
+
+    // Trigger Benchmark Evaluation
+    async function triggerEvaluation() {
+      const btn = document.getElementById('eval-run-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[10px] mr-1"></i> Running Benchmark...`;
+
+      try {
+        const res = await fetch(`${API_BASE}/evaluation/run`, { method: 'POST' });
+        const data = await res.json();
+        renderEvaluationResults(data);
+        switchTab('evaluation');
+      } catch (err) {
+        alert("Evaluation failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-play text-[10px]"></i><span>Run Evaluation Suite</span>`;
+      }
+    }
+
+    // Load Latest Evaluation
+    async function loadLatestEvaluation() {
+      try {
+        const res = await fetch(`${API_BASE}/evaluation/results`);
+        const data = await res.json();
+        if (data) {
+          renderEvaluationResults(data);
+        }
+      } catch (err) {
+        console.error("Error loading evaluation:", err);
+      }
+    }
+
+    function renderEvaluationResults(data) {
+      document.getElementById('eval-r1').innerText = data.recall_at_1.toFixed(2);
+      document.getElementById('eval-r3').innerText = data.recall_at_3.toFixed(2);
+      document.getElementById('eval-r5').innerText = data.recall_at_5.toFixed(2);
+      document.getElementById('eval-r10').innerText = data.recall_at_10.toFixed(2);
+      document.getElementById('eval-mrr').innerText = data.mrr.toFixed(2);
+      document.getElementById('eval-faith').innerText = data.faithfulness.toFixed(2);
+      document.getElementById('eval-rel').innerText = data.answer_relevance.toFixed(2);
+      document.getElementById('eval-samples-count').innerText = `${data.total_samples} Benchmark Samples`;
+
+      renderCharts(data);
+    }
+
+    function renderCharts(data) {
+      // Retrieval Chart
+      const ctxRet = document.getElementById('chart-retrieval').getContext('2d');
+      if (retrievalChart) retrievalChart.destroy();
+      retrievalChart = new Chart(ctxRet, {
+        type: 'bar',
+        data: {
+          labels: ['Recall@1', 'Recall@3', 'Recall@5', 'Recall@10', 'MRR'],
+          datasets: [{
+            label: 'Score',
+            data: [data.recall_at_1, data.recall_at_3, data.recall_at_5, data.recall_at_10, data.mrr],
+            backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#a855f7'],
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { min: 0, max: 1.0, grid: { color: '#1e293b' } }, x: { grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // Generation Chart
+      const ctxGen = document.getElementById('chart-generation').getContext('2d');
+      if (generationChart) generationChart.destroy();
+      generationChart = new Chart(ctxGen, {
+        type: 'bar',
+        data: {
+          labels: ['Faithfulness (Grounding)', 'Answer Relevance'],
+          datasets: [{
+            label: 'Score',
+            data: [data.faithfulness, data.answer_relevance],
+            backgroundColor: ['#10b981', '#f59e0b'],
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { min: 0, max: 1.0, grid: { color: '#1e293b' } }, x: { grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>

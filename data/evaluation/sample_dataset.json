@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "question": "What is the company's annual leave policy?",
+    "expected_document": "employee_handbook.pdf",
+    "expected_text_contains": "annual leave",
+    "reference_answer": "Employees are entitled to 20 days of paid annual leave per calendar year."
+  },
+  {
+    "id": 2,
+    "question": "What is the policy code for remote work security?",
+    "expected_document": "security_policy.pdf",
+    "expected_text_contains": "SEC-402",
+    "reference_answer": "The remote work security policy is designated under code SEC-402."
+  },
+  {
+    "id": 3,
+    "question": "What was the company revenue in 2035?",
+    "expected_document": null,
+    "expected_text_contains": null,
+    "reference_answer": "I could not find sufficient information in the provided documents to answer this question."
+  },
+  {
+    "id": 4,
+    "question": "How are travel expense claims submitted?",
+    "expected_document": "finance_policy.pdf",
+    "expected_text_contains": "expense report",
+    "reference_answer": "Expense claims must be submitted through the finance portal within 30 days."
+  }
+]
